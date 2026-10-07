@@ -133,24 +133,48 @@ def _norm(s: str) -> str:
 
 
 def attach_punctuation(words: list[Word], script: str) -> list[Word]:
-    """Boundary events usually drop punctuation. Re-align against the script
-    tokens so chunks can break at commas and full stops."""
+    """Re-align TTS word boundaries against the script tokens.
+
+    Boundary events drop punctuation, and some engines emit no event at all for
+    tokens like years ("1987"). Every script token ends up in the output: matched
+    tokens take the TTS timing, skipped ones are slotted into the gap between
+    their neighbours so no word silently vanishes from the captions.
+    """
     tokens = script.split()
+    timed: list[Word | None] = [None] * len(tokens)
     ti = 0
-    out = []
     for w in words:
         target = _norm(w.text)
-        match = None
-        for j in range(ti, min(ti + 4, len(tokens))):
-            if _norm(tokens[j]).startswith(target) or target.startswith(_norm(tokens[j])):
-                match = j
+        if not target:
+            continue
+        for j in range(ti, min(ti + 5, len(tokens))):
+            tok = _norm(tokens[j])
+            if tok and (tok.startswith(target) or target.startswith(tok)):
+                timed[j] = Word(tokens[j], w.start, w.end)
+                ti = j + 1
                 break
-        if match is not None and target:
-            out.append(Word(tokens[match], w.start, w.end))
-            ti = match + 1
-        else:
-            out.append(w)
-    return out
+
+    if not any(timed):
+        return words
+
+    # fill gaps: spread skipped tokens across the time between known neighbours
+    i = 0
+    while i < len(tokens):
+        if timed[i] is not None:
+            i += 1
+            continue
+        j = i
+        while j < len(tokens) and timed[j] is None:
+            j += 1
+        left = timed[i - 1].end if i > 0 else (timed[j].start - 0.3 * (j - i) if j < len(tokens) else 0.0)
+        right = timed[j].start if j < len(tokens) else left + 0.35 * (j - i)
+        left = max(left, 0.0)
+        span = max(right - left, 0.12 * (j - i))
+        for k in range(i, j):
+            s = left + span * (k - i) / (j - i)
+            timed[k] = Word(tokens[k], s, s + span / (j - i))
+        i = j
+    return [w for w in timed if w is not None]
 
 
 def build_chunks(words: list[Word], total: float, max_words: int = 3,
