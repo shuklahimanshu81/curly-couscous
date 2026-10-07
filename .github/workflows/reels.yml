@@ -1,0 +1,118 @@
+name: Sports Reel
+
+on:
+  schedule:
+    # GitHub cron is UTC. 02:00 and 13:00 UTC = 07:30 and 18:30 IST.
+    # Scheduled runs on busy repos can be delayed by several minutes; that is
+    # normal and does not matter for this.
+    - cron: "0 2 * * *"
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Force a specific topic (leave blank to use Google Trends)"
+        required: false
+        type: string
+      dry_run:
+        description: "Script only -- no video render, no spend"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: sports-reel
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: Write and render
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # needed to create the release asset and commit state
+    timeout-minutes: 45
+    outputs:
+      has_draft: ${{ steps.build.outputs.has_draft }}
+      topic: ${{ steps.build.outputs.topic }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Build the draft
+        id: build
+        working-directory: src
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
+          HEYGEN_AVATAR_ID: ${{ secrets.HEYGEN_AVATAR_ID }}
+          HEYGEN_VOICE_ID: ${{ secrets.HEYGEN_VOICE_ID }}
+          TRENDS_GEO: ${{ vars.TRENDS_GEO || 'IN' }}
+          MIN_SPORTS_SCORE: ${{ vars.MIN_SPORTS_SCORE || '3' }}
+          TARGET_SECONDS: ${{ vars.TARGET_SECONDS || '40' }}
+          ENABLE_INSTAGRAM: ${{ vars.ENABLE_INSTAGRAM || 'true' }}
+          ENABLE_YOUTUBE: ${{ vars.ENABLE_YOUTUBE || 'true' }}
+          YT_PRIVACY_STATUS: ${{ vars.YT_PRIVACY_STATUS || 'private' }}
+        run: |
+          python cli.py draft \
+            ${{ inputs.topic && format('--topic "{0}"', inputs.topic) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Save the draft for the publish job
+        if: steps.build.outputs.has_draft == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: draft
+          path: draft.json
+          retention-days: 7
+
+      - name: Remember the topic
+        if: steps.build.outputs.has_draft == 'true'
+        run: |
+          git config user.name  "reels-bot"
+          git config user.email "actions@github.com"
+          git add state/seen_topics.json
+          git diff --staged --quiet || git commit -m "Covered: ${{ steps.build.outputs.topic }}"
+          git push
+
+  publish:
+    name: Publish
+    needs: draft
+    if: needs.draft.outputs.has_draft == 'true'
+    runs-on: ubuntu-latest
+    # This is the approval gate. The job parks here until you press Approve in
+    # the Actions UI. Configure required reviewers on this environment or it
+    # will sail straight through.
+    environment: publish-approval
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: draft
+
+      - name: Publish
+        working-directory: src
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          ENABLE_INSTAGRAM: ${{ vars.ENABLE_INSTAGRAM || 'true' }}
+          ENABLE_YOUTUBE: ${{ vars.ENABLE_YOUTUBE || 'true' }}
+          YT_PRIVACY_STATUS: ${{ vars.YT_PRIVACY_STATUS || 'private' }}
+        run: python cli.py publish
