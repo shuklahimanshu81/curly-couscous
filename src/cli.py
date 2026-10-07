@@ -32,6 +32,12 @@ def log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def annotate(level: str, title: str, msg: str) -> None:
+    """Surface a line at the top of the run page in the Actions UI."""
+    clean = str(msg).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::{level} title={title}::{clean}", flush=True)
+
+
 def summary(markdown: str) -> None:
     """Write to the Actions job summary -- this is what you read before approving."""
     path = os.getenv("GITHUB_STEP_SUMMARY")
@@ -68,6 +74,7 @@ def pick_topic(forced: str | None) -> Trend | None:
                 f"{config.DEDUPE_DAYS} days")
             continue
         log(f"Picked {trend.title!r} (score {trend.score})")
+        annotate("notice", "Topic", f"{trend.title} (score {trend.score})")
         return trend
 
     log("Every sports trend in this run has been covered already.")
@@ -212,7 +219,11 @@ def main() -> int:
     publish.set_defaults(func=cmd_publish)
 
     args = parser.parse_args()
-    return args.func(args)
+    try:
+        return args.func(args)
+    except Exception as exc:
+        annotate("error", type(exc).__name__, str(exc)[:900])
+        raise
 
 
 if __name__ == "__main__":
