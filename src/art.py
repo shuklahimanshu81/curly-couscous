@@ -159,7 +159,7 @@ def retro_1987():
     # beige CRT
     d.rounded_rectangle((X(.18), Y(.26), X(.78), Y(.58)), 40, fill=(222, 212, 186))
     d.rounded_rectangle((X(.24), Y(.30), X(.72), Y(.52)), 30, fill=(20, 40, 24))
-    mono = ImageFont.truetype("DejaVuSansMono.ttf", 46) if _has("DejaVuSansMono.ttf") else None
+    mono = ImageFont.truetype(str(_font("VT323-Regular.ttf")), 64)
     lines = ["C:\\> DIR", "HPWORK   DOC", "REPORT   TXT", "C:\\> _"]
     for i, ln in enumerate(lines):
         if mono:

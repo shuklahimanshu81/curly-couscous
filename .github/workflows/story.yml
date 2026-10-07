@@ -23,10 +23,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install ffmpeg and fonts
-        run: |
-          command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
-          fc-list | grep -q DejaVuSansMono || sudo apt-get install -y -qq fonts-dejavu-core
+      - name: Install ffmpeg
+        timeout-minutes: 5
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
       - run: pip install -r requirements.txt
       - name: Render and upload
         working-directory: src
