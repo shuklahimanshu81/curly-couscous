@@ -1,0 +1,54 @@
+name: Story Reel
+
+# Render a scripted, scene-by-scene Reel from a JSON spec in stories/.
+# Output lands in the "drafts" release; nothing is posted.
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: "Path to the story spec"
+        required: true
+        default: "stories/may-lee-antarctica.json"
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ffmpeg and fonts
+        run: |
+          command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          fc-list | grep -q DejaVuSansMono || sudo apt-get install -y -qq fonts-dejavu-core
+      - run: pip install -r requirements.txt
+      - name: Render and upload
+        working-directory: src
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TTS_VOICE: ${{ vars.TTS_VOICE || 'en-IN-PrabhatNeural' }}
+          SPEC_IN: ${{ inputs.spec }}
+        run: |
+          python - <<'PY'
+          import json, os, time
+          from pathlib import Path
+          import hosting, story
+          spec_path = Path("..") / os.environ["SPEC_IN"]
+          spec = json.loads(spec_path.read_text())
+          name = f"story-{spec_path.stem}-{time.strftime('%Y%m%d-%H%M')}.mp4"
+          out = Path("/tmp") / name
+          t0 = time.time()
+          story.render(spec, out)
+          print(f"rendered in {time.time()-t0:.0f}s, {out.stat().st_size/1e6:.1f} MB")
+          url = hosting.upload(out, name)
+          print(f"::notice title=Video::{url}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write(f"## {spec['title']}\n\n**[Watch the render]({url})**\n\n"
+                       f"### Caption\n\n```\n{spec.get('caption','')}\n```\n")
+          PY

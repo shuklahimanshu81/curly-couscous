@@ -1,0 +1,47 @@
+{
+  "title": "Laid off at 59. Then she moved to Antarctica.",
+  "caption": "Laid off at 59 after more than three decades at HP. Her next job was at the bottom of the planet.\n\nWould you take it?\n\nStory via Business Insider.\n\n#antarctica #layoff #careerchange #reinvention #mcmurdo",
+  "rate": "+4%",
+  "scenes": [
+    {
+      "id": "hook",
+      "visuals": [{"art": "office", "until": 0.42}, {"art": "ice"}],
+      "vo": "Thirty years at one company. Then one day it was over, and her next job was at the bottom of the planet.",
+      "text": "30 YEARS → ANTARCTICA"
+    },
+    {
+      "id": "setup",
+      "visuals": [{"art": "retro_1987"}],
+      "vo": "May Lee joined HP in 1987 as an intern. She stayed for over three decades. At 59, she was laid off.",
+      "text": "1987: Intern. 59: Laid off."
+    },
+    {
+      "id": "struggle",
+      "visuals": [{"art": "rejections"}],
+      "vo": "She applied everywhere in tech. She used every contact she had. Nothing worked."
+    },
+    {
+      "id": "turn",
+      "visuals": [{"art": "antarctica_holiday"}],
+      "vo": "She'd been to Antarctica twice, just on holiday. She wondered: can you actually work there? It turns out you can.",
+      "text": "\"Can you work in Antarctica?\""
+    },
+    {
+      "id": "new_life",
+      "visuals": [{"art": "mcmurdo"}],
+      "vo": "She became a supply technician at McMurdo Station, handling cargo, tracking inventory and doing hard physical work. The pay was much lower. She loved it anyway.",
+      "text": "Less money. More life."
+    },
+    {
+      "id": "twist",
+      "visuals": [{"art": "broadcast"}],
+      "vo": "And now, at 60, she's going back. This time as a broadcast engineer."
+    },
+    {
+      "id": "cta",
+      "visuals": [{"art": "horizon"}],
+      "vo": "A layoff isn't always the end of the story. Sometimes it's the first page. Would you take this job? Comment below.",
+      "text": "Would YOU go? ❄️"
+    }
+  ]
+}
