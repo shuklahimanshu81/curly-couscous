@@ -40,6 +40,13 @@ HEYGEN_BASE = "https://api.heygen.com"
 HEYGEN_POLL_SECONDS = int(_opt("HEYGEN_POLL_SECONDS", "15"))
 HEYGEN_TIMEOUT_MINUTES = int(_opt("HEYGEN_TIMEOUT_MINUTES", "20"))
 
+# --- Video ----------------------------------------------------------------
+# "local" = edge-tts voice + rendered captions (free). "heygen" = avatar video.
+VIDEO_ENGINE = _opt("VIDEO_ENGINE", "local")
+TTS_VOICE = _opt("TTS_VOICE", "en-IN-PrabhatNeural")   # or en-IN-NeerjaNeural
+TTS_RATE = _opt("TTS_RATE", "+8%")
+CHANNEL_HANDLE = _opt("CHANNEL_HANDLE", "")              # e.g. "@yoursportsdaily"
+
 # --- Hosting (GitHub Release assets on a public repo) --------------------
 GITHUB_REPOSITORY = _opt("GITHUB_REPOSITORY")          # "owner/repo", set by Actions
 GITHUB_TOKEN = _opt("GITHUB_TOKEN")                    # the workflow's own token

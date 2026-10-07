@@ -13,8 +13,17 @@ on:
         description: "Force a specific topic (leave blank to use Google Trends)"
         required: false
         type: string
+      script:
+        description: "Paste your own script (skips Claude)"
+        required: false
+        type: string
+      preview:
+        description: "Preview only -- render and upload, don't queue for posting"
+        required: false
+        type: boolean
+        default: false
       dry_run:
-        description: "Script only -- no video render, no spend"
+        description: "Script only -- no video render"
         required: false
         type: boolean
         default: false
@@ -41,6 +50,9 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Install ffmpeg
+        run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
       - run: pip install -r requirements.txt
 
       - name: Build the draft
@@ -58,10 +70,22 @@ jobs:
           ENABLE_INSTAGRAM: ${{ vars.ENABLE_INSTAGRAM || 'true' }}
           ENABLE_YOUTUBE: ${{ vars.ENABLE_YOUTUBE || 'true' }}
           YT_PRIVACY_STATUS: ${{ vars.YT_PRIVACY_STATUS || 'private' }}
+          VIDEO_ENGINE: ${{ vars.VIDEO_ENGINE || 'local' }}
+          TTS_VOICE: ${{ vars.TTS_VOICE || 'en-IN-PrabhatNeural' }}
+          TTS_RATE: ${{ vars.TTS_RATE || '+8%' }}
+          CHANNEL_HANDLE: ${{ vars.CHANNEL_HANDLE }}
+          # inputs travel as env vars, never spliced into the shell command
+          TOPIC_IN: ${{ inputs.topic }}
+          SCRIPT_IN: ${{ inputs.script }}
+          DRY_IN: ${{ inputs.dry_run }}
+          PREVIEW_IN: ${{ inputs.preview }}
         run: |
-          python cli.py draft \
-            ${{ inputs.topic && format('--topic "{0}"', inputs.topic) || '' }} \
-            ${{ inputs.dry_run && '--dry-run' || '' }}
+          ARGS=()
+          [ -n "$TOPIC_IN" ]  && ARGS+=(--topic "$TOPIC_IN")
+          [ -n "$SCRIPT_IN" ] && ARGS+=(--script "$SCRIPT_IN")
+          [ "$DRY_IN" = "true" ]     && ARGS+=(--dry-run)
+          [ "$PREVIEW_IN" = "true" ] && ARGS+=(--preview)
+          python cli.py draft "${ARGS[@]}"
 
       - name: Save the draft for the publish job
         if: steps.build.outputs.has_draft == 'true'

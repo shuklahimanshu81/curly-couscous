@@ -82,16 +82,29 @@ def pick_topic(forced: str | None) -> Trend | None:
 
 
 def cmd_draft(args) -> int:
-    trend = pick_topic(args.topic)
-    if trend is None:
-        summary("## Nothing to post\n\nNo fresh sports trend cleared the filter this run.")
-        set_output("has_draft", "false")
-        return 0
+    if args.script:
+        # A hand-written script: no trend lookup, no Claude call.
+        topic = args.topic or "Sports update"
+        trend = Trend(title=topic, score=99)
+        words = len(args.script.split())
+        draft = {
+            "script": script_gen._enforce_length(args.script),
+            "caption": f"{topic}\n\n#sports #cricket #trending #sportsnews",
+            "headline": topic,
+            "estimated_seconds": round(words / script_gen.WORDS_PER_SECOND, 1),
+        }
+        log(f"Using supplied script ({words} words)")
+    else:
+        trend = pick_topic(args.topic)
+        if trend is None:
+            summary("## Nothing to post\n\nNo fresh sports trend cleared the filter this run.")
+            set_output("has_draft", "false")
+            return 0
 
-    log("Writing script...")
-    draft = script_gen.generate(trend)
-    log(f"Script ready: ~{draft['estimated_seconds']}s, "
-        f"{len(draft['script'].split())} words")
+        log("Writing script...")
+        draft = script_gen.generate(trend)
+        log(f"Script ready: ~{draft['estimated_seconds']}s, "
+            f"{len(draft['script'].split())} words")
 
     if args.dry_run:
         summary(
@@ -103,16 +116,37 @@ def cmd_draft(args) -> int:
         set_output("has_draft", "false")
         return 0
 
-    import avatar  # imported here so --dry-run never needs HeyGen creds
+    prefix = "preview" if args.preview else "reel"
+    filename = f"{prefix}-{time.strftime('%Y%m%d-%H%M')}.mp4"
 
-    log("Rendering avatar video. This usually takes a few minutes...")
-    heygen_url = avatar.render(draft["script"])
-
-    filename = f"reel-{time.strftime('%Y%m%d-%H%M')}.mp4"
     with tempfile.TemporaryDirectory() as tmp:
-        video_url = hosting.host(heygen_url, filename, Path(tmp))
+        if config.VIDEO_ENGINE == "heygen":
+            import avatar
+
+            log("Rendering avatar video with HeyGen...")
+            heygen_url = avatar.render(draft["script"])
+            video_url = hosting.host(heygen_url, filename, Path(tmp))
+        else:
+            import video
+
+            log(f"Rendering locally: voice {config.TTS_VOICE}, captions, motion graphics...")
+            started = time.time()
+            local = video.render(draft["script"], trend.title, Path(tmp) / filename)
+            log(f"Rendered in {time.time() - started:.0f}s "
+                f"({local.stat().st_size / 1e6:.1f} MB)")
+            video_url = hosting.upload(local, filename)
     hosting.prune_old_assets()
     log(f"Hosted at {video_url}")
+    annotate("notice", "Video", video_url)
+
+    if args.preview:
+        summary(
+            f"## Preview: {trend.title}\n\n**[Watch the render]({video_url})** · "
+            f"~{draft['estimated_seconds']}s\n\n### Script\n\n> {draft['script']}\n\n"
+            f"Preview only: nothing was queued for publishing.\n"
+        )
+        set_output("has_draft", "false")
+        return 0
 
     payload = {
         "topic": trend.title,
@@ -213,6 +247,8 @@ def main() -> int:
     draft = sub.add_parser("draft")
     draft.add_argument("--topic", default=None)
     draft.add_argument("--dry-run", action="store_true")
+    draft.add_argument("--script", default=None, help="use this script instead of Claude")
+    draft.add_argument("--preview", action="store_true", help="render + host, but don't queue")
     draft.set_defaults(func=cmd_draft)
 
     publish = sub.add_parser("publish")
