@@ -1,0 +1,34 @@
+name: HeyGen lookup
+
+# One-off helper: lists the avatars and voices available on your HeyGen key,
+# so you can pick HEYGEN_AVATAR_ID and HEYGEN_VOICE_ID. Run it from the Actions tab.
+on:
+  workflow_dispatch:
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: List avatars and voices
+        working-directory: src
+        env:
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
+        run: |
+          python - <<PY
+          import os, avatar
+          out = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(out, "a") as fh:
+              fh.write("## Avatars\n\n| avatar_id | name | gender |\n|---|---|---|\n")
+              for a in avatar.list_avatars()[:60]:
+                  fh.write(f"| `{a.get(\"avatar_id\")}` | {a.get(\"avatar_name\")} | {a.get(\"gender\")} |\n")
+              fh.write("\n## Voices (English)\n\n| voice_id | name | language | gender |\n|---|---|---|---|\n")
+              for v in avatar.list_voices():
+                  if "english" in str(v.get("language","")).lower():
+                      fh.write(f"| `{v.get(\"voice_id\")}` | {v.get(\"name\")} | {v.get(\"language\")} | {v.get(\"gender\")} |\n")
+          print("done")
+          PY
